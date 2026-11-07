@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 610" role="img" aria-label="fleet architecture: one center machine holds the setup, secrets and engine; the engine renders compose files and streams them over ssh to each server machine; on-box runners on the servers back up volumes to a restic repository">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .machine{fill:#eef2f7;stroke:#94a3b8;stroke-width:1.5}
+      .box{fill:#fff;stroke:#cbd5e1}
+      .alt{fill:#f1f5f9;stroke-dasharray:4 3}
+      .ext{fill:#fff;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}
+      .mtitle{font:700 17px system-ui,sans-serif;fill:#0f172a}
+      .mtag{font:italic 12px system-ui,sans-serif;fill:#64748b}
+      .title{font:600 14px system-ui,sans-serif;fill:#0f172a}
+      .sub{font:12px system-ui,sans-serif;fill:#475569}
+      .edge{fill:none;stroke:#64748b;stroke-width:1.6;marker-end:url(#arr)}
+      .lbl{font:11.5px system-ui,sans-serif;fill:#475569}
+      @media (prefers-color-scheme: dark){
+        .machine{fill:#1e293b;stroke:#64748b}
+        .box{fill:#0f172a;stroke:#475569}
+        .alt{fill:#172033}
+        .ext{fill:#0f172a;stroke:#64748b}
+        .mtitle,.title{fill:#f1f5f9}
+        .sub,.lbl,.mtag{fill:#cbd5e1}
+        .edge{stroke:#94a3b8}
+      }
+    </style>
+  </defs>
+
+  <!-- Center machine -->
+  <rect class="machine" x="20" y="50" width="380" height="420" rx="10"/>
+  <text class="mtitle" x="40" y="80">Center</text>
+  <text class="mtag" x="380" y="80" text-anchor="end">your workstation or CI</text>
+
+  <rect class="box" x="40" y="100" width="200" height="90" rx="6"/>
+  <text class="title" x="54" y="126">Setup</text>
+  <text class="sub" x="54" y="148">fleet.yaml · manifests</text>
+  <text class="sub" x="54" y="166">templates · hooks</text>
+
+  <rect class="box" x="260" y="100" width="120" height="90" rx="6"/>
+  <text class="title" x="274" y="126">Secrets</text>
+  <text class="sub" x="274" y="148">vault via</text>
+  <text class="sub" x="274" y="166">secret plugin</text>
+
+  <rect class="box" x="40" y="240" width="340" height="130" rx="6"/>
+  <text class="title" x="54" y="266">fleet engine</text>
+  <text class="sub" x="54" y="290">resolve → prepare → render → validate → ship</text>
+  <text class="sub" x="54" y="314">rendered files: _tmp/&lt;host&gt;/&lt;svc&gt;/</text>
+  <text class="sub" x="54" y="338">never prints a secret value</text>
+
+  <rect class="box alt" x="40" y="390" width="340" height="60" rx="6"/>
+  <text class="title" x="54" y="415">Docker (optional)</text>
+  <text class="sub" x="54" y="435">only to run each service's validate hook</text>
+
+  <path class="edge" d="M 140 190 V 240"/>
+  <path class="edge" d="M 320 190 V 240"/>
+
+  <!-- Server box1 -->
+  <rect class="machine" x="640" y="50" width="420" height="200" rx="10"/>
+  <text class="mtitle" x="660" y="80">Server · box1</text>
+  <text class="mtag" x="1040" y="80" text-anchor="end">docker + ssh only</text>
+  <rect class="box" x="660" y="100" width="115" height="80" rx="6"/>
+  <text class="title" x="672" y="126">Compose</text>
+  <text class="sub" x="672" y="146">project(s)</text>
+  <text class="sub" x="672" y="164">containers</text>
+  <rect class="box" x="790" y="100" width="115" height="80" rx="6"/>
+  <text class="title" x="802" y="126">Volumes</text>
+  <text class="sub" x="802" y="146">external,</text>
+  <text class="sub" x="802" y="164">seeded once</text>
+  <rect class="box alt" x="920" y="100" width="115" height="80" rx="6"/>
+  <text class="title" x="932" y="126">On-box</text>
+  <text class="sub" x="932" y="146">scheduler,</text>
+  <text class="sub" x="932" y="164">backup runners</text>
+  <text class="lbl" x="660" y="210">no checkout, no env files, no config of its own</text>
+  <text class="lbl" x="660" y="230">runners execute inside containers</text>
+
+  <!-- Server box2 -->
+  <rect class="machine" x="640" y="270" width="420" height="200" rx="10"/>
+  <text class="mtitle" x="660" y="300">Server · box2</text>
+  <text class="mtag" x="1040" y="300" text-anchor="end">docker + ssh only</text>
+  <rect class="box" x="660" y="320" width="115" height="80" rx="6"/>
+  <text class="title" x="672" y="346">Compose</text>
+  <text class="sub" x="672" y="366">project(s)</text>
+  <text class="sub" x="672" y="384">containers</text>
+  <rect class="box" x="790" y="320" width="115" height="80" rx="6"/>
+  <text class="title" x="802" y="346">Volumes</text>
+  <text class="sub" x="802" y="366">external,</text>
+  <text class="sub" x="802" y="384">seeded once</text>
+  <rect class="box alt" x="920" y="320" width="115" height="80" rx="6"/>
+  <text class="title" x="932" y="346">On-box</text>
+  <text class="sub" x="932" y="366">scheduler,</text>
+  <text class="sub" x="932" y="384">backup runners</text>
+  <text class="lbl" x="660" y="430">no checkout, no env files, no config of its own</text>
+  <text class="lbl" x="660" y="450">runners execute inside containers</text>
+
+  <!-- Ship edges -->
+  <path class="edge" d="M 400 290 C 520 290 520 150 640 150"/>
+  <path class="edge" d="M 400 320 C 520 320 520 370 640 370"/>
+  <text class="lbl" x="410" y="278">compose via ssh stdin</text>
+  <text class="lbl" x="410" y="346">volume tar via ssh</text>
+
+  <!-- Backup repository -->
+  <rect class="ext" x="640" y="510" width="420" height="70" rx="10"/>
+  <text class="title" x="660" y="538">Backup repository (restic)</text>
+  <text class="sub" x="660" y="560">snapshots tagged fleet / svc / vol</text>
+
+  <path class="edge" d="M 977 450 V 510"/>
+  <path class="edge" d="M 1035 230 H 1080 V 545 H 1060"/>
+  <text class="lbl" x="985" y="486">backup</text>
+</svg>

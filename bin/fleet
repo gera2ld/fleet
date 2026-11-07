@@ -1,0 +1,5 @@
+#!/bin/sh
+# Run the control plane from any directory. The setup root is discovered from
+# PWD (nearest fleet.yaml) unless FLEET_ROOT is set.
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+exec bun "$here/../fleet.ts" "$@"
