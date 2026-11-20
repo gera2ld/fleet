@@ -3,6 +3,7 @@
 // running container whose registry tag has moved gets `NEW`.
 import { $ } from "bun";
 import { join } from "node:path";
+import { parse } from "yaml";
 import { TMP_DIR, allHosts, serviceNames, hostsFor } from "./inv";
 import { execSpec } from "./remote";
 
@@ -11,6 +12,7 @@ import { execSpec } from "./remote";
 // (out of scope, not there).
 type Box = {
   project: string;
+  service: string; // compose service label; "" for a container with none
   state: string;
   healthy: boolean;
   img: string; // id of the image the container is actually running
@@ -29,8 +31,11 @@ const paint = (css: string, s: string) => {
   return open ? `${open}${s}\x1b[0m` : s;
 };
 
-function statusCell(boxes: Box[], inScope: boolean): string {
-  if (boxes.length === 0) return inScope ? `${paint("red", WARN)} absent` : ".";
+// Orphans are counted apart: they are not part of the deployment, so they must
+// neither make a half-dead service look up nor hide that it is missing.
+function statusCell(boxes: Box[], inScope: boolean, orphans = 0): string {
+  const tag = orphans > 0 ? ` ${paint("red", `${orphans} orphan${orphans > 1 ? "s" : ""}`)}` : "";
+  if (boxes.length === 0) return inScope ? `${paint("red", WARN)} absent${tag}` : `.${tag}`;
   const up = boxes.filter((b) => b.state === "running");
   const state = up.length === 0 ? "stopped" : up.length < boxes.length ? "partial" : "up";
   const flags: string[] = [];
@@ -38,7 +43,21 @@ function statusCell(boxes: Box[], inScope: boolean): string {
   if (up.some((b) => b.outdated)) flags.push(paint("yellow", "NEW"));
   if (!inScope) flags.push("off-scope");
   const cell = flags.length ? `${state} ${flags.join(" ")}` : state;
-  return inScope && state === "up" ? cell : `${paint("red", WARN)} ${cell}`;
+  return inScope && state === "up" && !orphans ? cell : `${paint("red", WARN)} ${cell}${tag}`;
+}
+
+// The services a host's rendered compose declares, or null when there is no
+// render to compare against (never rendered, or out of scope there): then
+// nothing can be called an orphan. `up` renders just before deploying, so right
+// after a deploy this is the config the containers were started from.
+async function declaredServices(host: string, svc: string): Promise<Set<string> | null> {
+  try {
+    const doc = parse(await Bun.file(join(TMP_DIR, host, svc, "compose.yml")).text());
+    const services = doc?.services;
+    return services && typeof services === "object" ? new Set(Object.keys(services)) : null;
+  } catch {
+    return null;
+  }
 }
 
 // "62% (30GB/48GB)" — used/total, red at >=90% full, yellow at >=80%.
@@ -171,7 +190,7 @@ export async function status(hosts: string[]) {
     `; R=$(docker ps -q --filter 'label=com.docker.compose.project')` +
     `; if [ -n "$R" ]; then IMGS=$(docker inspect $R --format '{{.Image}}' | sort -u)` +
     `; docker image inspect $IMGS --format 'D|{{.Id}}|{{join .RepoDigests ","}}'; fi` +
-    `; if [ -n "$IDS" ]; then docker inspect $IDS --format '{{index .Config.Labels "com.docker.compose.project"}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.Image}}|{{.Config.Image}}'; fi` +
+    `; if [ -n "$IDS" ]; then docker inspect $IDS --format '{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.Image}}|{{.Config.Image}}'; fi` +
     `; df -P / /var/lib/docker 2>/dev/null | awk 'NR>1 && !seen[$1]++ {print "F|" $6 "|" $5 "|" $3 "|" $4}'` +
     `; if [ -e /run/reboot-required ]; then printf 'R|%s\\n' "$(tr '\\n' ',' < /run/reboot-required.pkgs 2>/dev/null)"; fi`;
   const found = new Map<string, Box[] | null>(); // host -> containers; null = unreachable
@@ -206,10 +225,11 @@ export async function status(hosts: string[]) {
                 .filter(Boolean),
             );
             if (set.size) digests.set(f[1]!, set);
-          } else if (f.length === 5) {
-            const [project = "", state = "", health = "", img = "", ref = ""] = f;
+          } else if (f.length === 6) {
+            const [project = "", service = "", state = "", health = "", img = "", ref = ""] = f;
             boxes.push({
               project,
+              service,
               state,
               healthy: health === "healthy",
               img,
@@ -283,12 +303,18 @@ export async function status(hosts: string[]) {
     const row: Record<string, string> = {};
     for (const h of names) {
       const boxes = found.get(h);
-      row[h] = boxes
-        ? statusCell(
-            boxes.filter((b) => b.project === svc),
-            scope.has(h),
-          )
-        : `${paint("red", WARN)} ?`;
+      if (!boxes) {
+        row[h] = `${paint("red", WARN)} ?`;
+        continue;
+      }
+      const mine = boxes.filter((b) => b.project === svc);
+      const declared = scope.has(h) ? await declaredServices(h, svc) : null;
+      const orphans = declared ? mine.filter((b) => b.service && !declared.has(b.service)) : [];
+      row[h] = statusCell(
+        mine.filter((b) => !orphans.includes(b)),
+        scope.has(h),
+        orphans.length,
+      );
     }
     table[svc] = row;
   }

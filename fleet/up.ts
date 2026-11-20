@@ -12,10 +12,18 @@ import { render } from "./render";
 // data, so remote edits survive; push-volumes writes config explicitly.
 // forceRecreate is what you want after pushing volume content, since compose
 // would otherwise see an unchanged config and leave the container alone.
-export async function up(svc: string, hosts: string[], opts: { forceRecreate?: boolean } = {}) {
+// removeOrphans drops containers of this project whose service left the compose
+// file (a renamed or split service), which compose otherwise only warns about.
+export async function up(
+  svc: string,
+  hosts: string[],
+  opts: { forceRecreate?: boolean; removeOrphans?: boolean } = {},
+) {
   const names = await render(svc, hosts);
   const vols = Object.keys(service(svc).volumes);
-  const verb = opts.forceRecreate ? "up -d --force-recreate" : "up -d";
+  const verb = ["up -d", opts.forceRecreate && "--force-recreate", opts.removeOrphans && "--remove-orphans"]
+    .filter(Boolean)
+    .join(" ");
   let bad = 0;
   for (const name of names) {
     const target = sshTarget(name);
@@ -164,14 +172,18 @@ export async function restart(svc: string, hosts: string[]) {
 }
 
 // Stop and remove the deployment (networks and volumes stay).
-export async function down(svc: string, hosts: string[]) {
+export async function down(
+  svc: string,
+  hosts: string[],
+  opts: { removeOrphans?: boolean } = {},
+) {
   const names = await render(svc, hosts, { teardown: true });
   let bad = 0;
   for (const name of names) {
     const target = sshTarget(name);
     console.log(`=== ${name} (${target}) ===`);
     const compose = join(TMP_DIR, name, svc, "compose.yml");
-    const r = await $`${execSpec(name, composeRemote(svc, "down"))} < ${compose}`.nothrow();
+    const r = await $`${execSpec(name, composeRemote(svc, opts.removeOrphans ? "down --remove-orphans" : "down"))} < ${compose}`.nothrow();
     if (r.exitCode === 0) console.log(`ok: ${name}`);
     else {
       console.error(`FAIL: ${name}`);

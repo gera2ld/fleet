@@ -27,7 +27,11 @@ const serviceCommands: Record<string, ServiceCommand> = {
 // Kept out of the loop so the flags land where commander documents them.
 const serviceFlags: Record<string, (c: Command) => Command> = {
   up: (c) =>
-    c.option("--force-recreate", "recreate the containers even if the config is unchanged"),
+    c
+      .option("--force-recreate", "recreate the containers even if the config is unchanged")
+      .option("--remove-orphans", "remove containers of services no longer in the compose file"),
+  down: (c) =>
+    c.option("--remove-orphans", "also remove containers of services no longer in the compose file"),
 };
 const hostCommands = {
   setup: (hosts: string[]) => setup(allHosts(hosts)),
