@@ -4,10 +4,10 @@
 // resolve there.
 import { Command, CommanderError } from "commander";
 import { loadEnv } from "../shared/load-env";
-import { main as backupDb } from "./backup-db";
+import { main as backupVolume } from "./backup-volume";
 import { main as backupPrune } from "./backup-prune";
 
-// backup-db expects its environment already in process.env; when a repo env
+// backup-volume expects its environment already in process.env; when a repo env
 // file is given, decrypt and merge it first (the standalone load-env wrapper
 // did exactly this).
 async function withEnvFile(file: string, run: () => Promise<void>): Promise<void> {
@@ -21,11 +21,11 @@ async function withEnvFile(file: string, run: () => Promise<void>): Promise<void
 const program = new Command().name("onbox").description("in-container backup jobs").exitOverride();
 
 program
-  .command("backup-db")
+  .command("backup-volume")
   .argument("[envfile]", "repo-relative .env.enc to load first")
   .action(async (envfile?: string) => {
-    if (envfile) await withEnvFile(envfile, backupDb);
-    else await backupDb();
+    if (envfile) await withEnvFile(envfile, backupVolume);
+    else await backupVolume();
   });
 
 program

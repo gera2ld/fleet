@@ -59,7 +59,7 @@ Volumes and backups:
 - Restic credentials come from an encrypted env file (`_envs/fleet-backup.env.enc` by default), unlocked by `FLEET_ENCRYPTION_KEY` from the vault.
 
 **On-box jobs** (`onbox/cli.ts`) — the in-container entry, dispatched by a
-service's scheduler (`backup-db`, `backup-prune`). A setup bundles it with
+service's scheduler (`backup-volume`, `backup-prune`). A setup bundles it with
 `bun build --target=bun` into one file for the volume, so the container
 needs no engine checkout. Service-agnostic; setup-specific scripts live in
 the setup and are copied alongside.
