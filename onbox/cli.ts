@@ -36,17 +36,13 @@ program
   });
 
 try {
-  await program.parseAsync(Bun.argv.slice(2));
+  // Commander strips the runtime and script path itself; slicing here would
+  // strip them twice and leave it with no command to dispatch.
+  await program.parseAsync(Bun.argv);
 } catch (e) {
   if (e instanceof CommanderError) {
-    // With exitOverride, help is thrown with code 1 — and a missing argument
-    // throws the same code. An explicit --help exits 0, anything else is an
-    // error, so distinguish by whether help was actually asked for.
-    const askedHelp = Bun.argv.some((a) => a === "--help" || a === "-h" || a === "help");
-    if (e.code === "commander.help" && askedHelp) process.exit(0);
-    if (e.code === "commander.help") process.exit(1);
-    console.error(e.message.replace(/^error: /, ""));
-    process.exit(1);
+    // Help and errors were already printed by Commander; honor its exit code.
+    process.exit(e.exitCode);
   }
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
