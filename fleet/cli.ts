@@ -1,6 +1,6 @@
 // CLI dispatch: argv -> command modules. Exit codes are set by the commands.
 import { Command, CommanderError } from "commander";
-import { InventoryError, allHosts } from "./inv";
+import { InventoryError } from "./inv";
 import { envTool, dumpBackup, resticBackup, resticRestore } from "./backup";
 import { render } from "./render";
 import { prepareService } from "./prepare";
@@ -34,7 +34,6 @@ const serviceFlags: Record<string, (c: Command) => Command> = {
     c.option("--remove-orphans", "also remove containers of services no longer in the compose file"),
 };
 const hostCommands = {
-  setup: (hosts: string[]) => setup(allHosts(hosts)),
   status,
 } as const;
 
@@ -75,6 +74,17 @@ function build(): { program: Command; diag: () => string } {
         await fn(hosts);
       });
   }
+
+  program
+    .command("setup")
+    .description("converge host units: docker networks, then host/host.yaml's units")
+    .argument("[hosts...]", "defaults to every inventory server; narrows each unit's scope")
+    .option("--only <units>", "comma-separated unit names (built-in: networks)")
+    .option("--check", "report drift and change nothing (exits non-zero on drift)")
+    .option("--render-only", "write the scripts to _tmp/<host>/_host/ and touch no box")
+    .action(async (hosts: string[], opts: { only?: string; check?: boolean; renderOnly?: boolean }) => {
+      await setup(hosts, opts);
+    });
 
   // Deploy runs this with no force, so only a human can change a committed value.
   program

@@ -18,6 +18,9 @@ Nothing in a setup is published with the engine.
     compose.yml.tmpl     the Compose file
     prepare.ts           optional render hook
     generated-envs.json  committed derived values (optional)
+  host/
+    host.yaml            host units for `setup` (optional)
+    <unit>.sh[.tmpl]     one POSIX sh script per unit
   justfile               wires the setup to the engine (optional)
 ```
 
@@ -57,6 +60,7 @@ volumes: # OPTIONAL: external volumes the service expects
     backup: #   OPTIONAL: what `volume restic-backup` snapshots
       sqlite: [] #   live dbs → online .backup copy
       file: [] #   read as-is; a path or a whole directory
+public_ports: ["443", "443/udp"] # OPTIONAL published ports bound to every interface
 servers: # OPTIONAL deploy scope; absent = all servers
   - box1
 backup: # OPTIONAL: backups that are not volume files
@@ -94,6 +98,11 @@ networks:
 ```
 
 - Ingress through caddy labels: `virtual.bind: <port> <host> [modifiers]`.
+- Published `ports:` bind an address (`"{{ .Env.MESH_IP }}:3901:3901"`,
+  `127.0.0.1:…`). One with no host IP is reachable from anywhere — docker
+  forwards it ahead of the host firewall — so render refuses it unless the
+  manifest lists its host-side port under `public_ports`. Those lists are also
+  what the ufw host unit opens (`FLEET_PUBLIC_PORTS`, per host by scope).
 - Prefer `snake_case` for new volumes (`myservice_data`); kebab is for
   service and network names.
 
@@ -144,6 +153,40 @@ export default hook.default;
   compose in `ctx.root` and a staged volume tree from `ctx.dirFor(vol)`.
   `dockerValidate` runs the service's own image — never a different build,
   which would reject config the box serves. It warns and returns without Docker.
+
+## Host units: `host/host.yaml`
+
+`setup [hosts...]` converges the boxes themselves: first the built-in
+`networks` unit (the shared docker networks, run as the ssh user), then each
+unit in `host/host.yaml`, in declaration order, as root.
+
+```yaml
+units:
+  ufw:
+    script: ufw.sh.tmpl # host/-relative; `.tmpl` is gomplate-rendered per host
+    servers: [box1]     # OPTIONAL scope; explicit hosts narrow it, never widen
+env:                    # precedence: fleet default < fleet <host>
+  default: { KEY: v }   #           < host.yaml default < host.yaml <host>
+```
+
+- A unit states a state, not a sequence. The preamble defines `fleet_fix`;
+  every change goes through it:
+  `<already so?> || fleet_fix "<what is wrong>" <command that fixes it>`.
+  In apply mode it prints `fix: …` and runs the command; under `--check` it
+  prints `drift: …` and changes nothing. A converged box prints nothing.
+- `--check` exits non-zero on drift; `--only a,b` picks units;
+  `--render-only` writes the full scripts to `_tmp/<host>/_host/` and touches
+  no box. Every unit renders before the first box is touched.
+- No secret plugin in host units: their text lands in `_tmp/` and on the box.
+- Root, per host: the ssh user being root, else passwordless sudo, else the
+  sudo password — asked on the terminal once per host per run (Enter reuses
+  the last one), checked with `sudo -v` first, and sent as the first stdin
+  line ahead of the script (`sudo -k -S /bin/sh -s`), so it never reaches argv
+  or disk. Without a terminal (cron) a password-needing host fails instead.
+- Variables available to scripts: `FLEET_HOST`, `FLEET_UNIT`, `FLEET_CHECK`
+  (`1` under `--check`); templates also get `FLEET_PUBLIC_PORTS`, the
+  `public_ports` of every service scoped to the host, space-separated and
+  normalized (`443/tcp 443/udp 9009-9013/tcp`).
 
 ## Secrets and the vault
 

@@ -58,7 +58,7 @@ function deepMerge(
 }
 
 // Scalar env values only; numbers/booleans stringify (e.g. PORT: 8080).
-const EnvBlocksSchema = z.record(
+export const EnvBlocksSchema = z.record(
   z.string(),
   z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
 );
@@ -162,6 +162,10 @@ const ServiceFileSchema = z.strictObject({
         .default([]),
     }),
   ),
+  // Published ports allowed to bind every interface (`80:80` with no host IP):
+  // the render gate refuses any other, and the host firewall opens exactly
+  // these. `443`, `443/udp`, `9009-9013` — the host-side (published) port.
+  public_ports: z.array(z.union([z.string().min(1), z.number().int()])).default([]),
   // Deploy scope: explicit list, or all servers when absent.
   servers: z.array(z.string().min(1)).min(1).optional(),
   // Same block shape as the shared `env` in fleet.yaml (see EnvBlocksSchema).
@@ -222,6 +226,29 @@ export function serviceNames(): string[] {
     .sort();
 }
 
+// `<port>[-<port>]/<proto>`: the one spelling a published port is compared in.
+const PORT_SPEC = /^(\d+)(?:-(\d+))?\/(tcp|udp)$/;
+
+export function normalizePort(raw: string | number): string | undefined {
+  const s = String(raw).trim().toLowerCase();
+  const spec = s.includes("/") ? s : `${s}/tcp`;
+  const m = PORT_SPEC.exec(spec);
+  if (!m) return undefined;
+  const lo = Number(m[1]);
+  const hi = m[2] === undefined ? lo : Number(m[2]);
+  if (lo < 1 || hi > 65535 || hi < lo) return undefined;
+  return lo === hi ? `${lo}/${m[3]}` : `${lo}-${hi}/${m[3]}`;
+}
+
+// A service's declared public ports, normalized; a malformed entry fails.
+export function publicPorts(svc: string): string[] {
+  return service(svc).public_ports.map((p) => {
+    const n = normalizePort(p);
+    if (!n) fail(`${svc}/service.yaml: public_ports entry '${p}' is not <port>[-<port>][/tcp|udp]`);
+    return n;
+  });
+}
+
 export function sshTarget(name: string): string {
   const target = servers()[name];
   if (typeof target !== "string" || target === "") {
@@ -270,28 +297,40 @@ function generatedEnv(svc: string): Record<string, string> {
 // A value may reference another key as $NAME or ${NAME} ($$ is a literal $),
 // resolved against the merged per-host map; unknown names and cycles fail loud.
 export function envFor(svc: string, host?: string): Record<string, string> {
+  if (host && !(host in servers())) fail(`unknown server '${host}' (not in fleet inventory)`);
+  const data = service(svc);
+  const shared = inventory().env;
+  return layerEnv(
+    `${svc}/service.yaml`,
+    [shared["default"], host ? shared[host] : undefined, data.env["default"], host ? data.env[host] : undefined],
+    generatedEnv(svc),
+    host,
+  );
+}
+
+// The layering and reference pass behind envFor, shared with host units: later
+// blocks win, `generated` sits under all of them and is never interpolated.
+export function layerEnv(
+  where: string,
+  blocks: (EnvBlock | undefined)[],
+  generated: Record<string, string> = {},
+  host?: string,
+): Record<string, string> {
   const merged: Record<string, string> = {};
   const PLACEHOLDER = "\x00DOLLAR\x00";
   // Generated values are literal, never interpolated: a hash is full of `$` and
   // the reference pass below would read those as key names.
-  for (const [k, v] of Object.entries(generatedEnv(svc))) {
+  for (const [k, v] of Object.entries(generated)) {
     merged[k] = v.replaceAll("$", PLACEHOLDER);
   }
-  const assign = (block: EnvBlock | undefined) => {
-    if (!block) return;
+  for (const block of blocks) {
+    if (!block) continue;
     for (const [k, v] of Object.entries(block)) merged[k] = String(v);
-  };
-  if (host && !(host in servers())) fail(`unknown server '${host}' (not in fleet inventory)`);
-  const data = service(svc);
-  const shared = inventory().env;
-  assign(shared["default"]);
-  if (host) assign(shared[host]);
-  assign(data.env["default"]);
-  if (host) assign(data.env[host]);
+  }
   const scope = host ? ` for host '${host}'` : "";
   for (const k of Object.keys(merged)) {
     const cur = merged[k];
-    if (cur === undefined) fail(`${svc}/service.yaml: missing env value for '${k}'`);
+    if (cur === undefined) fail(`${where}: missing env value for '${k}'`);
     merged[k] = cur.replace(/\$\$/g, PLACEHOLDER);
   }
   const resolved: Record<string, string> = {};
@@ -299,17 +338,15 @@ export function envFor(svc: string, host?: string): Record<string, string> {
     const cached = resolved[key];
     if (cached !== undefined) return cached;
     if (trail.includes(key))
-      fail(`${svc}/service.yaml: circular env reference: ${[...trail, key].join(" -> ")}`);
+      fail(`${where}: circular env reference: ${[...trail, key].join(" -> ")}`);
     const raw = merged[key];
-    if (raw === undefined) fail(`${svc}/service.yaml: missing env value for '${key}'`);
+    if (raw === undefined) fail(`${where}: missing env value for '${key}'`);
     const expanded = raw.replace(
       /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
       (_m, braced: string | undefined, plain: string | undefined) => {
         const name = (braced ?? plain) as string;
         if (!(name in merged)) {
-          fail(
-            `${svc}/service.yaml: env '${trail[0] ?? key}'${scope} references unknown key '${name}'`,
-          );
+          fail(`${where}: env '${trail[0] ?? key}'${scope} references unknown key '${name}'`);
         }
         return resolve(name, [...trail, key]);
       },
@@ -320,7 +357,7 @@ export function envFor(svc: string, host?: string): Record<string, string> {
   for (const k of Object.keys(merged)) resolve(k, []);
   for (const k of Object.keys(resolved)) {
     const val = resolved[k];
-    if (val === undefined) fail(`${svc}/service.yaml: missing env value for '${k}'`);
+    if (val === undefined) fail(`${where}: missing env value for '${k}'`);
     merged[k] = val.replaceAll(PLACEHOLDER, "$");
   }
   return merged;

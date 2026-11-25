@@ -176,8 +176,7 @@ import { define, readSecret, type ServiceHook } from "fleet";
 | `FLEET_SECRET_PLUGIN`                          | `<fleet>/secret.sh`                          | secret provider            |
 | `FLEET_VAULT_FILES`                            | `fnox.toml,fnox.local.toml,.fnox.local.toml` | `secret list/check`        |
 | `FLEET_CLI`                                    | `fleet`                                      | how hints name the command |
-| `FLEET_GATEWAY_NETWORK` / `FLEET_EDGE_NETWORK` | `gateway` / `edge`                           | `setup`                    |
-| `GW_SUBNET` / `EDGE_SUBNET`                    | `172.16.0.0/16` / `172.30.0.0/16`            | `setup`                    |
+| `GW_SUBNET`                                    | `172.16.0.0/16`                              | `setup` (gateway network)  |
 
 `SCRIPTS` is this checkout and `ROOT` is the setup, resolved independently — the tool can live anywhere.
 
