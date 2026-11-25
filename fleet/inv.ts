@@ -6,9 +6,18 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, resolve } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
-import { ROOT } from "./paths";
+import { ROOT, SERVICES_DIR, serviceDir } from "./paths";
 
-export { CLI, ROOT, SCRIPTS, TMP_DIR, ENV_DIR, SECRET_PLUGIN } from "./paths";
+export {
+  CLI,
+  ROOT,
+  SCRIPTS,
+  SERVICES_DIR,
+  TMP_DIR,
+  ENV_DIR,
+  SECRET_PLUGIN,
+  serviceDir,
+} from "./paths";
 
 // A server whose target is this sentinel is the machine running the center:
 // commands run directly, no ssh. Declare it per-box in fleet.local.yaml.
@@ -174,7 +183,7 @@ const ServiceFileSchema = z.strictObject({
 export type ServiceFile = z.output<typeof ServiceFileSchema>;
 
 export function service(svc: string): ServiceFile {
-  const path = join(ROOT, svc, "service.yaml");
+  const path = join(serviceDir(svc), "service.yaml");
   const parsed = ServiceFileSchema.safeParse(loadMapping(path));
   if (!parsed.success) {
     const detail = parsed.error.issues
@@ -208,8 +217,8 @@ export function service(svc: string): ServiceFile {
   }
   // A derived env nobody re-derives is just a committed value that rots.
   if (
-    existsSync(join(ROOT, svc, "generated-envs.json")) &&
-    !existsSync(join(ROOT, svc, "prepare.ts"))
+    existsSync(join(serviceDir(svc), "generated-envs.json")) &&
+    !existsSync(join(serviceDir(svc), "prepare.ts"))
   ) {
     fail(`${svc}/generated-envs.json: no prepare.ts beside it — nothing validates that file`);
   }
@@ -219,9 +228,9 @@ export function service(svc: string): ServiceFile {
 // Every service in the fleet: top-level dirs holding a service.yaml
 // (`_`/`.`-prefixed infrastructure dirs are skipped).
 export function serviceNames(): string[] {
-  return readdirSync(ROOT, { withFileTypes: true })
+  return readdirSync(SERVICES_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith("."))
-    .filter((d) => existsSync(join(ROOT, d.name, "service.yaml")))
+    .filter((d) => existsSync(join(SERVICES_DIR, d.name, "service.yaml")))
     .map((d) => d.name)
     .sort();
 }
@@ -281,7 +290,7 @@ export function hostsFor(svc: string, explicit: string[]): string[] {
 // Per-service generated env: committed values derived from the vault by
 // <svc>/prepare.ts. Absent for services that have none.
 function generatedEnv(svc: string): Record<string, string> {
-  const path = join(ROOT, svc, "generated-envs.json");
+  const path = join(serviceDir(svc), "generated-envs.json");
   if (!existsSync(path)) return {};
   const parsed = z.record(z.string(), z.string()).safeParse(loadMapping(path, true));
   if (!parsed.success) {
@@ -384,7 +393,7 @@ function checkVolumeSource(svc: string, vol: string, rawTmpl: string): void {
   if (rawTmpl.startsWith("/")) {
     fail(`${svc}/service.yaml: volume '${vol}': source '${rawTmpl}' must be repo-relative`);
   }
-  const rel = relative(ROOT, resolve(ROOT, svc, rawTmpl));
+  const rel = relative(ROOT, resolve(serviceDir(svc), rawTmpl));
   if (rel === "" || rel.startsWith("..")) {
     fail(`${svc}/service.yaml: volume '${vol}': source '${rawTmpl}' escapes the repo`);
   }
@@ -441,7 +450,7 @@ export function volumeFiles(svc: string): VolumeFile[] {
         const tmplBase = rawTmpl.replace(/\/+$/, "");
         if (!tmplBase)
           fail(`${svc}/service.yaml: volume '${vol}': directory mapping needs a source dir`);
-        const abs = join(ROOT, svc, tmplBase);
+        const abs = join(serviceDir(svc), tmplBase);
         if (!existsSync(abs) || !statSync(abs).isDirectory()) {
           fail(`${svc}/service.yaml: volume '${vol}': '${rawTmpl}' is not a directory`);
         }

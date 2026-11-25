@@ -4,7 +4,6 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
-  ROOT,
   SECRET_PLUGIN,
   TMP_DIR,
   InventoryError,
@@ -12,6 +11,7 @@ import {
   hostsFor,
   normalizePort,
   publicPorts,
+  serviceDir,
   volumeFiles,
 } from "./inv";
 import { loadService, runService } from "./prepare";
@@ -121,20 +121,20 @@ export async function render(
   const files = volumeFiles(svc);
   for (const name of names) {
     const out = join(TMP_DIR, name, svc);
-    await renderFile(join(ROOT, svc, "compose.yml.tmpl"), join(out, "compose.yml"), svc, name);
+    await renderFile(join(serviceDir(svc), "compose.yml.tmpl"), join(out, "compose.yml"), svc, name);
     checkPublishedPorts(svc, name, parseYaml(await Bun.file(join(out, "compose.yml")).text()));
     let rendered = 0;
     for (const f of files) {
       const dest = join(out, f.vol, f.target);
-      if (join(ROOT, svc, f.tmpl).endsWith(".tmpl")) {
-        await renderFile(join(ROOT, svc, f.tmpl), dest, svc, name);
+      if (join(serviceDir(svc), f.tmpl).endsWith(".tmpl")) {
+        await renderFile(join(serviceDir(svc), f.tmpl), dest, svc, name);
         rendered++;
       } else {
         // Opaque source (ciphertext, images, plain config with no actions):
         // gomplate is text-based and the `{{` check below would false-positive
         // on random bytes, so byte-copy instead of rendering.
         mkdirSync(dirname(dest), { recursive: true });
-        await Bun.write(dest, Bun.file(join(ROOT, svc, f.tmpl)));
+        await Bun.write(dest, Bun.file(join(serviceDir(svc), f.tmpl)));
       }
       if (f.target.endsWith(".json")) {
         try {

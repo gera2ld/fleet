@@ -13,11 +13,12 @@ Nothing in a setup is published with the engine.
   fnox.toml              vault entries (encrypted, never printed)
   _envs/                 encrypted env files (restic creds, etc.)
   _tmp/                  rendered previews (gitignored, disposable)
-  <svc>/
-    service.yaml         manifest
-    compose.yml.tmpl     the Compose file
-    prepare.ts           optional render hook
-    generated-envs.json  committed derived values (optional)
+  services/              every service, one directory each
+    <svc>/
+      service.yaml         manifest
+      compose.yml.tmpl     the Compose file
+      prepare.ts           optional render hook
+      generated-envs.json  committed derived values (optional)
   host/
     host.yaml            host units for `setup` (optional)
     <unit>.sh[.tmpl]     one POSIX sh script per unit
@@ -27,7 +28,9 @@ Nothing in a setup is published with the engine.
 `ROOT` (the setup) is resolved from `FLEET_ROOT` or the nearest `fleet.yaml`
 walking up from PWD. `SCRIPTS` is the engine checkout: `fleet/paths.ts` resolves
 it from `import.meta.dir`, so it works both in the checkout and installed.
-The two are independent.
+The two are independent. Services live in `<root>/services/` (`SERVICES_DIR`;
+`serviceDir(svc)` gives one service's directory) — the only place the engine
+looks. In the rest of this guide, `<svc>/` means `services/<svc>/`.
 
 ## The inventory: `fleet.yaml`
 
@@ -205,7 +208,7 @@ env:                    # precedence: fleet default < fleet <host>
 
 ## Adding a service — recipe
 
-1. `mkdir <svc>`, write `compose.yml.tmpl` (rules above).
+1. `mkdir services/<svc>`, write `compose.yml.tmpl` (rules above).
 2. Write `service.yaml`: pick `servers:` explicitly for anything stateful or
    single-box, set `env.default`, add per-host blocks only for differences.
 3. If a secret is needed, add it to the vault first (human side).
@@ -215,7 +218,7 @@ env:                    # precedence: fleet default < fleet <host>
    `bunx fleet up <svc>`.
 6. Verify on the box. Wire the deploy through your entry point (`just fleet`
    or `bunx fleet` via `FLEET_ROOT`).
-7. Commit `<svc>/`; wipe previews with `rm -rf _tmp` or your clean recipe.
+7. Commit `services/<svc>/`; wipe previews with `rm -rf _tmp` or your clean recipe.
 
 ## Driving the engine
 

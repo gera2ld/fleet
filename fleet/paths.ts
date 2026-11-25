@@ -25,6 +25,14 @@ export const ROOT = process.env.FLEET_ROOT
   ? resolve(process.env.FLEET_ROOT)
   : findRoot(process.cwd());
 
+// Every service directory lives under `<root>/services/`.
+export const SERVICES_DIR = join(ROOT, "services");
+
+// One service's directory: its manifest, templates and hook.
+export function serviceDir(svc: string): string {
+  return join(SERVICES_DIR, svc);
+}
+
 export const TMP_DIR = process.env.FLEET_TMP_DIR ?? join(ROOT, "_tmp");
 export const ENV_DIR = process.env.FLEET_ENV_DIR ?? join(ROOT, "_envs");
 

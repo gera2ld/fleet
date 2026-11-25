@@ -38,7 +38,7 @@ The center is the only machine with state worth protecting; servers can be rebui
 Three layers live on the center:
 
 - **Inventory** (`fleet.yaml`) — servers as `name -> ssh target`, plus shared env defaults. Target `localhost` runs on the center. A gitignored `fleet.local.yaml` merges over it key by key.
-- **Services** (`<svc>/service.yaml`) — one Compose project per directory. Declares deploy scope, env, external volumes and backup inputs. `compose.yml.tmpl` is the Compose file. An optional `prepare.ts` derives committed values or validates the rendered tree.
+- **Services** (`services/<svc>/service.yaml`) — one Compose project per directory under `services/`. Declares deploy scope, env, external volumes and backup inputs. `compose.yml.tmpl` is the Compose file. An optional `prepare.ts` derives committed values or validates the rendered tree.
 - **Secrets** — templates never see the vault. The renderer exposes one gomplate plugin, `secret`, implemented by an executable that prints a named value. Resolved values live only in memory and in `_tmp/`, and are never printed.
 
 A deploy:

@@ -6,7 +6,7 @@
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { CLI, envFor, InventoryError, loadMapping, ROOT, SECRET_PLUGIN } from "./inv";
+import { CLI, envFor, InventoryError, loadMapping, SECRET_PLUGIN, serviceDir } from "./inv";
 
 // `secret` names a vault entry, `env` a manifest env key — exactly one of them.
 // Env-sourced rows exist because some inputs are configuration, not secrets.
@@ -54,7 +54,7 @@ export async function readSecret(name: string): Promise<string> {
 }
 
 function envPath(svc: string): string {
-  return join(ROOT, svc, "generated-envs.json");
+  return join(serviceDir(svc), "generated-envs.json");
 }
 
 function readEnv(svc: string): Record<string, string> {
@@ -139,7 +139,7 @@ export type PrepareFn = () => Promise<void> | void;
 export type ServiceHook = { default: Table; prepare?: PrepareFn; validate?: ValidateFn };
 
 export async function loadService(svc: string): Promise<ServiceHook | undefined> {
-  const mod = join(ROOT, svc, "prepare.ts");
+  const mod = join(serviceDir(svc), "prepare.ts");
   if (!existsSync(mod)) return undefined;
   const loaded = (await import(mod)) as Partial<ServiceHook>;
   const table = loaded.default;

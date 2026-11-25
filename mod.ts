@@ -10,5 +10,14 @@ export {
   runService,
 } from "./fleet/prepare";
 export type { Env, Kind, Row, Table, ValidateCtx, ValidateFn, ServiceHook } from "./fleet/prepare";
-export { ROOT, SCRIPTS, TMP_DIR, ENV_DIR, SECRET_PLUGIN, CLI } from "./fleet/paths";
+export {
+  ROOT,
+  SCRIPTS,
+  SERVICES_DIR,
+  TMP_DIR,
+  ENV_DIR,
+  SECRET_PLUGIN,
+  CLI,
+  serviceDir,
+} from "./fleet/paths";
 export { hostsFor, service, serviceNames, envFor } from "./fleet/inv";

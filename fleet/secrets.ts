@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseToml } from "smol-toml";
-import { InventoryError, ROOT, hostsFor, serviceNames, volumeFiles } from "./inv";
+import { InventoryError, ROOT, hostsFor, serviceDir, serviceNames, volumeFiles } from "./inv";
 
 // The fnox backend is the default; point FLEET_VAULT_FILES at another
 // TOML [secrets] table to reuse the report against a compatible vault.
@@ -49,8 +49,8 @@ function vaultNames(): string[] {
 // a `secret` call inside it would never run.
 function templateSources(svc: string): string[] {
   const sources = [
-    join(ROOT, svc, "compose.yml.tmpl"),
-    ...volumeFiles(svc).map((f) => join(ROOT, svc, f.tmpl)),
+    join(serviceDir(svc), "compose.yml.tmpl"),
+    ...volumeFiles(svc).map((f) => join(serviceDir(svc), f.tmpl)),
   ];
   return [...new Set(sources)].filter((p) => p.endsWith(".tmpl"));
 }
@@ -113,7 +113,7 @@ function report(): { rows: Row[]; vault: number } {
         for (const host of hosts) use(`${m[1]}${host.toUpperCase()}`, svc, true);
       }
     }
-    const prepare = join(ROOT, svc, "prepare.ts");
+    const prepare = join(serviceDir(svc), "prepare.ts");
     if (existsSync(prepare)) {
       for (const name of prepareNames(prepare)) use(name, svc, false);
     }
