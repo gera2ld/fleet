@@ -454,8 +454,11 @@ export function volumeFiles(svc: string): VolumeFile[] {
         if (!existsSync(abs) || !statSync(abs).isDirectory()) {
           fail(`${svc}/service.yaml: volume '${vol}': '${rawTmpl}' is not a directory`);
         }
+        // A `.tmpl` source is rendered, so its target drops the suffix — as
+        // compose.yml.tmpl becomes compose.yml. Raw files keep their names.
         for (const rel of walkDir(abs)) {
-          out.push({ vol, target: `${targetBase}${rel}`, tmpl: posix.join(tmplBase, rel) });
+          const target = `${targetBase}${rel.replace(/\.tmpl$/, "")}`;
+          out.push({ vol, target, tmpl: posix.join(tmplBase, rel) });
         }
       } else {
         out.push({ vol, target: rawTarget, tmpl: rawTmpl });
