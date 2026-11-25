@@ -124,8 +124,10 @@ networks:
 Then:
 
 ```sh
-# Install the engine as a package (for prepare.ts hooks).
-bun add file:../fleet
+# Add the engine as a submodule and a bun workspace (for prepare.ts hooks).
+git submodule add https://github.com/gera2ld/fleet.git fleet
+# package.json: "workspaces": ["fleet"], "dependencies": { "fleet": "workspace:*" }
+bun install
 
 # Render (writes _tmp/<host>/myservice/, nothing is pushed).
 bunx fleet render myservice
@@ -153,10 +155,12 @@ The CLI is the reference for verbs and arguments: `--help` on the program or any
 Host arguments default to the inventory (or the service's declared scope).
 `exec`, `volume run` and `env` hand their tail to another command after `--`.
 
-Install the engine as a local package:
+Use the engine as a git submodule and a bun workspace. Bun symlinks a
+workspace package instead of copying it, so engine edits take effect without
+a reinstall, and the submodule pins the exact engine commit a setup needs:
 
 ```json
-{ "dependencies": { "fleet": "file:../fleet" } }
+{ "workspaces": ["fleet"], "dependencies": { "fleet": "workspace:*" } }
 ```
 
 ```ts
